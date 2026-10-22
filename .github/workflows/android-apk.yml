@@ -1,0 +1,175 @@
+name: Android APK
+
+# Собирает APK через game-ci (Unity в Docker) и публикует его в GitHub Release.
+#
+# Что нужно один раз настроить в репозитории (Settings → Secrets and variables → Actions):
+#   UNITY_LICENSE  — содержимое файла .ulf (личная лицензия) ИЛИ .xml (серийная)
+#   UNITY_EMAIL    — почта аккаунта Unity
+#   UNITY_PASSWORD — пароль аккаунта Unity
+#
+# Файл лицензии получается так:
+#   1) Actions → «Unity Activation» → Run workflow
+#   2) скачать артефакт Unity_*.alf
+#   3) загрузить его на https://license.unity3d.com/manual
+#   4) скачать выданный .ulf и положить его содержимое в секрет UNITY_LICENSE
+#
+# Готовый APK всегда лежит по постоянной ссылке:
+#   https://github.com/<owner>/<repo>/releases/tag/apk-latest
+
+on:
+  workflow_dispatch:
+    inputs:
+      unity_version:
+        description: 'Версия Unity (auto = из ProjectSettings/ProjectVersion.txt)'
+        required: false
+        default: 'auto'
+      enable_gpu:
+        description: 'Собирать с графикой (нужно, если URP-шейдеры не компилируются в -nographics)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+      export_type:
+        description: 'androidPackage = APK, androidAppBundle = AAB'
+        required: false
+        default: 'androidPackage'
+        type: choice
+        options: ['androidPackage', 'androidAppBundle']
+  push:
+    branches: [main]
+    paths:
+      - 'Assets/**'
+      - 'Packages/**'
+      - 'ProjectSettings/**'
+      - '.github/workflows/android-apk.yml'
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UNITY_VERSION: ${{ github.event.inputs.unity_version || 'auto' }}
+
+jobs:
+  preflight:
+    name: Проверка секретов Unity
+    runs-on: ubuntu-latest
+    steps:
+      - name: UNITY_LICENSE / UNITY_EMAIL / UNITY_PASSWORD
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          if [ -z "$UNITY_LICENSE" ] && [ -z "$UNITY_SERIAL" ]; then
+            echo "::error title=Нет лицензии Unity::Добавьте секрет UNITY_LICENSE (содержимое .ulf) в Settings → Secrets and variables → Actions."
+            echo "::notice::Файл .alf для активации можно получить джобой «Unity Activation» в этом же репозитории."
+            exit 1
+          fi
+          if [ -z "$UNITY_EMAIL" ] || [ -z "$UNITY_PASSWORD" ]; then
+            echo "::error title=Нет учётных данных Unity::Добавьте секреты UNITY_EMAIL и UNITY_PASSWORD."
+            exit 1
+          fi
+          echo "Секреты на месте — можно собирать."
+
+  build:
+    name: Сборка Android
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+          fetch-depth: 0
+
+      - name: Кэш Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-android-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ runner.os }}-android-
+            Library-${{ runner.os }}-
+
+      - name: Собрать Android (game-ci)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: ${{ env.UNITY_VERSION }}
+          targetPlatform: Android
+          buildName: SandboxFPS
+          buildsPath: build
+          buildMethod: ${{ (github.event.inputs.export_type == 'androidAppBundle' && 'Sandbox.EditorTools.BuildRunner.BuildAndroidAab') || 'Sandbox.EditorTools.BuildRunner.BuildAndroid' }}
+          androidExportType: ${{ github.event.inputs.export_type || 'androidPackage' }}
+          androidVersionCode: ${{ github.run_number }}
+          versioning: Custom
+          version: 0.1.0
+          enableGpu: ${{ github.event.inputs.enable_gpu || 'false' }}
+          customParameters: '-buildPath build/Android'
+
+      - name: Что получилось
+        run: |
+          echo "=== Содержимое build/ ==="
+          find build -type f -exec ls -lh {} + || true
+          echo "=== APK/AAB ==="
+          find build -type f \( -name '*.apk' -o -name '*.aab' \) -exec du -h {} + || true
+
+      - name: Артефакт сборки
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sandbox-Android
+          path: |
+            build/**/*.apk
+            build/**/*.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Лог сборки Unity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-build-log
+          path: |
+            build/**/*.log
+            Library/**/*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Опубликовать в Release (постоянная ссылка apk-latest)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          ARTIFACT=$(find build -type f \( -name '*.apk' -o -name '*.aab' \) | head -n 1)
+          if [ -z "$ARTIFACT" ]; then
+            echo "::error::Не найден APK/AAB в build/ — публикация отменена."
+            exit 1
+          fi
+          EXT="${ARTIFACT##*.}"
+          NAME="Sandbox-FPS-${GITHUB_RUN_NUMBER}.${EXT}"
+          cp "$ARTIFACT" "$NAME"
+          SIZE=$(du -h "$NAME" | cut -f1)
+
+          TAG="apk-latest"
+          NOTES=$(printf 'Сборка #%s от %s UTC\n\nКоммит: %s\nВетка: %s\nФайл: %s (%s)\n\nУстановка: разрешить установку из неизвестных источников, затем открыть файл.\nТребования: Android 7.0+ (API 24), ARM64, ландшафтная ориентация.\nИгра полностью офлайн: сеть не используется и разрешение INTERNET не запрашивается.' \
+            "$GITHUB_RUN_NUMBER" "$(date -u +%Y-%m-%dT%H:%M:%S)" "$GITHUB_SHA" "$GITHUB_REF_NAME" "$NAME" "$SIZE")
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$NAME" --clobber
+            gh release edit "$TAG" --title "Sandbox FPS — APK (сборка ${GITHUB_RUN_NUMBER})" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$NAME" --title "Sandbox FPS — APK (сборка ${GITHUB_RUN_NUMBER})" --notes "$NOTES"
+          fi
+
+          VERSIONED="apk-v0.1.${GITHUB_RUN_NUMBER}"
+          gh release create "$VERSIONED" "$NAME" \
+            --title "Sandbox FPS ${VERSIONED}" \
+            --notes "$NOTES" || echo "Релиз $VERSIONED уже существует — пропускаю."
+
+          echo "::notice title=APK готов::https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
