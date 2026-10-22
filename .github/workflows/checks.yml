@@ -1,0 +1,61 @@
+name: Checks
+
+# Проверки, которые не требуют лицензии Unity: валидация структуры проекта
+# и численная проверка физики. Запускаются на каждый push и pull request,
+# чтобы сломанная сцена/дубли GUID/несбалансированный C# не уехали в сборку APK.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Валидация проекта и физики
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Зависимости
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml matplotlib
+
+      - name: Структура проекта, метаданные, C#, workflow'ы
+        run: python Tools/validate_project.py --strict
+
+      - name: Численная проверка физики (пробой пола, урон, бюджет A53)
+        run: python Tools/physics_check.py
+
+      - name: Отчёты и графики
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: physics-reports
+          path: |
+            Tools/reports/*.md
+            Tools/reports/*.png
+          if-no-files-found: warn
+
+      - name: Краткий итог в шаг сборки
+        if: always()
+        run: |
+          {
+            echo "## Проверка физики"
+            echo ""
+            echo "\`\`\`"
+            tail -n 22 Tools/reports/physics_report.md || true
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
