@@ -174,8 +174,11 @@ jobs:
             exit 1
           fi
           EXT="${ARTIFACT##*.}"
-          NAME="Sandbox-FPS-${GITHUB_RUN_NUMBER}.${EXT}"
+          # постоянное имя файла в релизе apk-latest → прямая ссылка не меняется от сборки к сборке
+          NAME="Sandbox-FPS.${EXT}"
           cp "$ARTIFACT" "$NAME"
+          VERSIONED_NAME="Sandbox-FPS-${GITHUB_RUN_NUMBER}.${EXT}"
+          cp "$ARTIFACT" "$VERSIONED_NAME"
           SIZE=$(du -h "$NAME" | cut -f1)
 
           TAG="apk-latest"
@@ -190,7 +193,7 @@ jobs:
           fi
 
           VERSIONED="apk-v0.1.${GITHUB_RUN_NUMBER}"
-          gh release create "$VERSIONED" "$NAME" \
+          gh release create "$VERSIONED" "$VERSIONED_NAME" \
             --title "Sandbox FPS ${VERSIONED}" \
             --notes "$NOTES" || echo "Релиз $VERSIONED уже существует — пропускаю."
 
