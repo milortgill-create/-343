@@ -198,3 +198,5 @@ jobs:
             --notes "$NOTES" || echo "Релиз $VERSIONED уже существует — пропускаю."
 
           echo "::notice title=APK готов::https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+
+# probe: 2026-10-22T08:18:48Z
