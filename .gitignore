@@ -64,3 +64,4 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+web-preview/node_modules/

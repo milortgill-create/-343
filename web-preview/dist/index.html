@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Sandbox FPS — тестовый полигон</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#20242a;touch-action:none;
+    -webkit-user-select:none;user-select:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #hud{position:fixed;inset:0;pointer-events:none;color:#e8ecf1}
+  #stick{position:fixed;width:120px;height:120px;margin:0;border:2px solid rgba(255,255,255,.35);
+    border-radius:50%;opacity:0;transition:opacity .15s;pointer-events:none}
+  #knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+    background:rgba(255,255,255,.45);border-radius:50%}
+  #cross{position:fixed;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;
+    border:2px solid rgba(255,255,255,.85);border-radius:50%;transition:transform .1s,border-color .1s}
+  #cross::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;background:#fff;border-radius:50%}
+  #cross.on{transform:scale(1.3);border-color:#ff9d3c}
+  #stats{position:fixed;left:10px;top:10px;font:12px/1.45 ui-monospace,monospace;background:rgba(10,12,16,.55);
+    padding:8px 10px;border-radius:8px;white-space:pre}
+  #prompt{position:fixed;left:50%;bottom:18%;transform:translateX(-50%);font-size:15px;font-weight:600;
+    background:rgba(10,12,16,.5);padding:6px 14px;border-radius:20px}
+  #toast{position:fixed;left:50%;top:12%;transform:translateX(-50%);font-size:15px;font-weight:600;
+    background:rgba(20,26,34,.75);padding:8px 16px;border-radius:22px;opacity:0;transition:opacity .3s}
+  .btns{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;pointer-events:auto}
+  .row{display:flex;gap:10px}
+  button{pointer-events:auto;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;
+    font:700 12px/1 system-ui;width:64px;height:64px;backdrop-filter:blur(4px);touch-action:manipulation}
+  button:active{background:rgba(255,255,255,.34)}
+  button.on{background:rgba(90,180,255,.45)}
+  #btnAction{width:96px;height:96px;font-size:13px;background:rgba(255,157,60,.35)}
+  #top{position:fixed;right:14px;top:10px;display:flex;gap:8px;pointer-events:auto}
+  #top button{width:44px;height:44px;font-size:15px}
+  #portrait{position:fixed;inset:0;background:#14181d;display:none;place-items:center;text-align:center;
+    font-size:18px;padding:24px;z-index:9}
+  @media (orientation:portrait){#portrait{display:grid}}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="hud">
+  <div id="stats"></div>
+  <div id="cross"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="stick"><div id="knob"></div></div>
+  <div id="top">
+    <button id="btnFull" title="Во весь экран">⛶</button>
+    <button id="btnReset" title="Сброс полигона">⟲</button>
+  </div>
+  <div class="btns">
+    <div class="row">
+      <button id="btnRun">БЕГ</button>
+      <button id="btnJump">ПРЫЖОК</button>
+    </div>
+    <button id="btnAction">ДЕЙСТВИЕ</button>
+  </div>
+</div>
+<div id="portrait">Поверните телефон горизонтально ↔<br><small>полигон работает в альбомной ориентации</small></div>
+<script src="bundle.js"></script>
+</body>
+</html>
