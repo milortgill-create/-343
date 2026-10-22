@@ -55,24 +55,8 @@ jobs:
     name: Проверка секретов Unity
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        if: ${{ secrets.UNITY_LICENSE == '' && secrets.UNITY_SERIAL == '' && (secrets.UNITY_EMAIL == '' || secrets.UNITY_PASSWORD == '') }}
-        uses: actions/checkout@v4
-
-      - name: Нет лицензии — генерируем файл активации (.alf)
-        if: ${{ secrets.UNITY_LICENSE == '' && secrets.UNITY_SERIAL == '' && (secrets.UNITY_EMAIL == '' || secrets.UNITY_PASSWORD == '') }}
-        uses: game-ci/unity-request-activation-file@v2
-
-      - name: Нет лицензии — артефакт с файлом активации
-        if: ${{ secrets.UNITY_LICENSE == '' && secrets.UNITY_SERIAL == '' && (secrets.UNITY_EMAIL == '' || secrets.UNITY_PASSWORD == '') }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: unity-activation-file
-          path: |
-            *.alf
-          if-no-files-found: error
-
-      - name: UNITY_LICENSE / UNITY_EMAIL / UNITY_PASSWORD
+      - name: Оценка секретов
+        id: probe
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
@@ -80,13 +64,39 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
           if [ -n "$UNITY_LICENSE" ] || [ -n "$UNITY_SERIAL" ]; then
+            echo "how=license" >> "$GITHUB_OUTPUT"
+            echo "missing=0" >> "$GITHUB_OUTPUT"
             echo "Лицензия Unity найдена — можно собирать."
-            exit 0
-          fi
-          if [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
+          elif [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
+            echo "how=credentials" >> "$GITHUB_OUTPUT"
+            echo "missing=0" >> "$GITHUB_OUTPUT"
             echo "Есть UNITY_EMAIL/UNITY_PASSWORD — game-ci активирует Unity сам."
-            exit 0
+          else
+            echo "how=none" >> "$GITHUB_OUTPUT"
+            echo "missing=1" >> "$GITHUB_OUTPUT"
+            echo "Секретов активации Unity нет — подготовим файл .alf."
           fi
+
+      - name: Checkout
+        if: steps.probe.outputs.missing == '1'
+        uses: actions/checkout@v4
+
+      - name: Нет лицензии — генерируем файл активации (.alf)
+        if: steps.probe.outputs.missing == '1'
+        uses: game-ci/unity-request-activation-file@v2
+
+      - name: Нет лицензии — артефакт с файлом активации
+        if: steps.probe.outputs.missing == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-activation-file
+          path: |
+            *.alf
+          if-no-files-found: error
+
+      - name: Инструкция, если секретов нет
+        if: steps.probe.outputs.missing == '1'
+        run: |
           echo "::error title=Нет лицензии Unity::Сборка остановлена: нечем активировать Unity."
           echo ""
           echo "К этому прогону прикреплён артефакт unity-activation-file (файл .alf)."
