@@ -68,16 +68,24 @@ def load_unity_yaml(text: str):
 
 
 # ---------------------------------------------------------------------------
+def unity_ignored(name: str) -> bool:
+    """Unity не импортирует скрытые файлы, временные '~' и служебные папки —
+    для них не создаются .meta, поэтому и проверять их не нужно."""
+    return name.startswith(".") or name.endswith("~") or name.lower() in {"cvs", ".tmp"}
+
+
 def iter_asset_files():
     for root, dirs, files in os.walk(ASSETS):
-        dirs[:] = sorted(dirs)
+        dirs[:] = sorted(d for d in dirs if not unity_ignored(d))
         for f in sorted(files):
+            if unity_ignored(f):
+                continue
             yield os.path.join(root, f)
 
 
 def iter_asset_dirs():
     for root, dirs, _files in os.walk(ASSETS):
-        dirs[:] = sorted(dirs)
+        dirs[:] = sorted(d for d in dirs if not unity_ignored(d))
         for d in dirs:
             yield os.path.join(root, d)
 
