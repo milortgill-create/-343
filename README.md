@@ -116,15 +116,21 @@
 публикация в Release с постоянным тегом **`apk-latest`** и версионным
 `apk-v0.1.<номер сборки>`.
 
-Чтобы сборка пошла, нужно один раз положить в **Settings → Secrets and
-variables → Actions**:
+Чтобы сборка пошла, нужно один раз добавить секреты в
+**Settings → Secrets and variables → Actions** (достаточно первых двух):
 
-1. Запустить workflow **`unity-activation.yml`** (Actions → Unity Activation →
-   Run workflow) — он отдаст артефакт `unity-activation-file` с файлом `.alf`.
-2. Открыть <https://license.unity3d.com/manual>, загрузить `.alf`, скачать `.ulf`.
-3. Положить содержимое `.ulf` в секрет **`UNITY_LICENSE`**, а почту и пароль
-   аккаунта Unity — в **`UNITY_EMAIL`** и **`UNITY_PASSWORD`**
-   (или `UNITY_SERIAL` вместо пары email/password).
+- **`UNITY_EMAIL`** и **`UNITY_PASSWORD`** — почта и пароль аккаунта Unity:
+  game-ci активирует бесплатную личную лицензию прямо внутри сборки;
+- **`UNITY_LICENSE`** (опционально) — содержимое файла `Unity_lic.ulf`, если
+  хочется без пароля: Unity Hub → Preferences → Licenses → Add →
+  *Get a free personal license*, затем взять файл
+  `C:\ProgramData\Unity\Unity_lic.ulf` (Windows),
+  `/Library/Application Support/Unity/Unity_lic.ulf` (macOS) или
+  `~/.local/share/unity3d/Unity/Unity_lic.ulf` (Linux).
+
+Пока секретов нет, прогон сборки останавливается на джобе-префлайте и печатает
+эту же инструкцию в лог и в шаг «Инструкция, если секретов нет».
+Актуальная документация game-ci: <https://game.ci/docs/github/activation>.
 
 После этого любой push в ветку или ручной запуск **Build Android APK**
 собирает APK; готовый файл лежит и в артефактах прогона, и в Release

@@ -1,43 +1,42 @@
 name: Unity Activation
 
-# Получает файл активации лицензии Unity (.alf).
-#
-# Как пользоваться:
-#   1. Actions → «Unity Activation» → Run workflow (нужны секреты UNITY_EMAIL и UNITY_PASSWORD)
-#   2. Скачать артефакт Unity_v2022.3.22f1.alf
-#   3. Открыть https://license.unity3d.com/manual и загрузить этот .alf
-#   4. Скачать выданный Unity_v2022.3.22f1.ulf
-#   5. Положить ВЕСЬ текст .ulf в секрет UNITY_LICENSE
-#      (Settings → Secrets and variables → Actions → New repository secret)
-#   6. Запустить «Android APK»
+# Раньше game-ci генерировал файл активации .alf отдельным action — сейчас этот
+# action отключён самим game-ci. Личная лицензия получается через Unity Hub
+# (или активируется внутри сборки по UNITY_EMAIL + UNITY_PASSWORD).
+# Этот workflow оставлен как кнопка с актуальной инструкцией.
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main, 'arena/**']
+    paths: ['.github/workflows/unity-activation.yml']
 
 jobs:
-  activation:
-    name: Запрос файла активации (.alf)
+  instructions:
+    name: Как активировать Unity для CI
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Запросить .alf у Unity
-        uses: game-ci/unity-request-activation-file@v2
-        id: request
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-
-      - name: Показать, что получилось
+      - name: Актуальная инструкция
         run: |
-          ls -la *.alf || true
-          echo "Дальше: скачайте артефакт ниже и загрузите его на https://license.unity3d.com/manual"
-
-      - name: Артефакт .alf
-        uses: actions/upload-artifact@v4
-        with:
-          name: unity-activation-file
-          path: '*.alf'
-          if-no-files-found: warn
-          retention-days: 7
+          {
+            echo "## Активация Unity для сборки APK"
+            echo ""
+            echo "### Вариант Б — быстрый (рекомендуется)"
+            echo "Добавьте в Settings → Secrets and variables → Actions два секрета:"
+            echo "- UNITY_EMAIL — почта аккаунта Unity;"
+            echo "- UNITY_PASSWORD — пароль аккаунта Unity."
+            echo "game-ci активирует бесплатную личную лицензию внутри сборки сам."
+            echo ""
+            echo "### Вариант А — файл лицензии .ulf"
+            echo "1. Unity Hub: Preferences → Licenses → Add → Get a free personal license."
+            echo "2. Найдите файл Unity_lic.ulf:"
+            echo "   - Windows: C:\\ProgramData\\Unity\\Unity_lic.ulf"
+            echo "   - macOS:   /Library/Application Support/Unity/Unity_lic.ulf"
+            echo "   - Linux:   ~/.local/share/unity3d/Unity/Unity_lic.ulf"
+            echo "3. Содержимое файла → секрет UNITY_LICENSE (плюс UNITY_EMAIL/UNITY_PASSWORD)."
+            echo ""
+            echo "Документация: https://game.ci/docs/github/activation"
+            echo ""
+            echo "После добавления секретов любой push в main или arena/** запускает сборку APK;"
+            echo "готовый файл — в артефактах прогона и в Release с тегом apk-latest."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
