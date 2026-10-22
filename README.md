@@ -132,9 +132,13 @@
 эту же инструкцию в лог и в шаг «Инструкция, если секретов нет».
 Актуальная документация game-ci: <https://game.ci/docs/github/activation>.
 
-После этого любой push в ветку или ручной запуск **Build Android APK**
-собирает APK; готовый файл лежит и в артефактах прогона, и в Release
-`apk-latest` (постоянная ссылка на свежий APK).
+После этого любой push в ветку запускает сборку; готовый файл лежит в артефактах
+прогона и в Release `apk-latest`.
+
+**Прямая ссылка на свежий APK (постоянная, работает после первой успешной сборки):**
+<https://github.com/milortgill-create/-343/releases/download/apk-latest/Sandbox-FPS.apk>
+
+Страница релиза со всеми версиями: <https://github.com/milortgill-create/-343/releases/tag/apk-latest>
 
 Workflow **`checks.yml`** на каждый push/PR прогоняет проверки без лицензии:
 целостность метаданных и GUID, валидность сцены/manifest/ProjectSettings,
